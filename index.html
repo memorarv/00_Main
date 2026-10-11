@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <title>Video QR</title>
+
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: black;
+      overflow: hidden;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: black;
+    }
+
+    #sound {
+      position: fixed;
+      bottom: 25px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 14px 22px;
+      border: 0;
+      border-radius: 30px;
+      background: white;
+      color: black;
+      font-size: 16px;
+      z-index: 2;
+    }
+  </style>
+</head>
+
+<body>
+  <video id="video" autoplay muted playsinline>
+    <source src="video.mp4" type="video/mp4">
+  </video>
+
+  <button id="sound">Activar sonido 🔊</button>
+
+  <script>
+    const video = document.getElementById("video");
+    const button = document.getElementById("sound");
+
+    button.addEventListener("click", async () => {
+      video.muted = false;
+
+      try {
+        await video.play();
+        button.style.display = "none";
+      } catch (error) {
+        video.muted = true;
+        button.textContent = "Toca para activar el sonido";
+      }
+    });
+  </script>
+</body>
+</html>
