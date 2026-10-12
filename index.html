@@ -148,7 +148,7 @@
       }
     });
     
-    soundbutton.addEventListener("click", async () => {
+    soundButton.addEventListener("click", async () => {
       video.muted = false;
 
       try {
@@ -165,6 +165,7 @@
     video.addEventListener("ended", () => {
       replayButton.style.display = "flex";
       soundButton.style.display = "none";
+      pausedText.style.display = "none";
       updatePausedPosition();
     });
 
