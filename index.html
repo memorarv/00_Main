@@ -47,14 +47,30 @@
      // border-radius: 12px;
      // padding: 0px 12px;
      background: rgba(224, 224, 224, 0.6);
-     font-size: 48px;
+     //font-size: 48px;
      text-align: center;
      line-height: 1;
      padding-top: 12px;
      padding-bottom: 14px;
      padding-left: 24px;
      padding-right: 20px;
+
+     flex-direction: column;
+     align-items: center;
+     justify-content: center;
+     gap: 4px;
     }
+
+    .replay-title {
+  font-size: 48px;
+  line-height: 1.1;
+    }
+
+.replay-subtitle {
+  font-size: 12px;
+  line-height: 1.2;
+    }
+    
   </style>
 </head>
 
@@ -64,7 +80,10 @@
   </video>
 
   <button id="sound">Activar sonido 🔊</button>
-  <button id="replay">▶</button>
+  <button id="replay">
+    <span class="replay-title">▶</span>
+    <span class="replay-subtitle">Reproducir nuevamente</span>
+  </button>
 
   <script>
     const video = document.getElementById("video");
