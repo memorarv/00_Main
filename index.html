@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -135,16 +135,14 @@
         return;
       }
 
-      if (video.paused) {
-        try {
-          await video.play();
-          pausedText.style.display = "none";
-        } catch (error) {
-          pausedText.style.display = "block";
-        }
-      } else {
-        video.pause();
-        pausedText.style.display = "block";
+      try {
+        await video.play();
+        pausedText.style.display = "none";
+        soundButton.style.display = "none";
+        updatePausedPosition();
+      } catch (error) {
+        video.muted = true;
+        soundButton.textContent = "Toca para activar el sonido";
       }
     });
     
