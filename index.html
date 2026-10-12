@@ -64,14 +64,18 @@
      gap: 4px;
     }
 
+    :root {
+      --paused-bottom: 40px;
+    }
+    
     #paused {
       display: none;
       position: fixed;
-      top: 50%;
+      bottom: var(--paused-bottom)
       left: 50%;
-      transform: translate(-50%, -50%);
-      color: white;
-      background: rgba(0, 0, 0, 0.6);
+      transform: translateX(-50%);
+      color: black;
+      background: rgba(224, 224, 224, 0.6);
       padding: 10px 20px;
       border-radius: 10px;
       // font-family: inherit;
@@ -111,6 +115,20 @@
     const replayButton = document.getElementById("replay");
     const pausedText = document.getElementById("paused");
 
+    // Función para actualizar la posición del aviso
+      function updatePausedPosition() {
+        const bottom = soundButton.style.display === "none"
+          ? "40px"
+          : "25px";
+
+        document.documentElement.style.setProperty(
+          "--paused-bottom", bottom
+        );
+      }
+
+      // Establecer la posición inicial
+      updatePausedPosition();
+    
     // Tocar el video para pausar o continuar
     video.addEventListener("click", async () => {
       if (video.ended) {
@@ -136,6 +154,7 @@
       try {
         await video.play();
         soundbutton.style.display = "none";
+        updatePausedPosition();
       } catch (error) {
         video.muted = true;
         soundbutton.textContent = "Toca para activar el sonido";
