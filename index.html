@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -146,18 +146,16 @@
       }
     });
     
-    soundButton.addEventListener("click", async () => {
+    soundButton.addEventListener("click", () => {
       video.muted = false;
+      soundButton.style.display = "none";
 
-      try {
-        await video.play();
-        pausedText.style.display = "none";
-        soundButton.style.display = "none";
-        updatePausedPosition();
-      } catch (error) {
-        video.muted = true;
-        soundButton.textContent = "Toca para activar el sonido";
+      // Mantener el aviso si el video está pausado
+      if (video.paused && !video.ended) {
+        pausedText.style.display = "block";
       }
+
+      updatePausedPosition();
     });
     
     // Mostrar el botón de repetición al finalizar
