@@ -151,6 +151,7 @@
 
       try {
         await video.play();
+        pausedText.style.display = "none";
         soundButton.style.display = "none";
         updatePausedPosition();
       } catch (error) {
@@ -163,8 +164,7 @@
     video.addEventListener("ended", () => {
       replayButton.style.display = "flex";
       soundButton.style.display = "none";
-      pausedText.style.display = "none";
-      updatePausedPosition();
+            updatePausedPosition();
     });
 
     // Reproducir nuevamente solo cuando la persona lo solicite
