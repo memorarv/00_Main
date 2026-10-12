@@ -90,6 +90,19 @@
     const soundbutton = document.getElementById("sound");
     const replayButton = document.getElementById("replay");
 
+    // Tocar el video para pausar o continuar
+    video.addEventListener("click", () => {
+      if (video.ended) {
+        return;
+      }
+
+      if (video.paused) {
+        video.play();
+      } else {
+        video.pause();
+      }
+    });
+    
     soundbutton.addEventListener("click", async () => {
       video.muted = false;
 
