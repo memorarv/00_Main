@@ -116,18 +116,18 @@
     const pausedText = document.getElementById("paused");
 
     // Función para actualizar la posición del aviso
-    // x  function updatePausedPosition() {
-    // x    const bottom = soundButton.style.display === "none"
-    // x      ? "40px"
-    // x      : "25px";
+      function updatePausedPosition() {
+        const bottom = soundButton.style.display === "none"
+          ? "75px"
+          : "25px";
 
-    // x    document.documentElement.style.setProperty(
-    // x      "--paused-bottom", bottom
-    // x    );
-    // x  }
+        document.documentElement.style.setProperty(
+          "--paused-bottom", bottom
+        );
+      }
 
       // Establecer la posición inicial
-    // x  updatePausedPosition();
+      updatePausedPosition();
     
     // Tocar el video para pausar o continuar
     video.addEventListener("click", async () => {
