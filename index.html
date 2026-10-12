@@ -85,13 +85,13 @@
     }
 
     .replay-title {
-  font-size: 48px;
-  line-height: 1.1;
+      font-size: 48px;
+      line-height: 1.1;
     }
 
-.replay-subtitle {
-  font-size: 12px;
-  line-height: 1.2;
+    .replay-subtitle {
+      font-size: 12px;
+      line-height: 1.2;
     }
     
   </style>
@@ -135,14 +135,20 @@
         return;
       }
 
-      try {
-        await video.play();
-        pausedText.style.display = "none";
-        soundButton.style.display = "none";
-        updatePausedPosition();
-      } catch (error) {
-        video.muted = true;
-        soundButton.textContent = "Toca para activar el sonido";
+      if (video.paused) {
+        // Reanudar la reproducción
+        try {
+          await video.play();
+          pausedText.style.display = "none";
+          soundButton.style.display = "none";
+          updatePausedPosition();
+        } catch (error) {
+          console.error("No se pudo reproducir el video:", error);
+        }
+      } else {
+        // Pausar la reproducción
+        video.pause();
+        pausedText.style.display = "block";
       }
     });
     
