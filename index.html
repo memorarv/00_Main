@@ -61,6 +61,21 @@
      gap: 4px;
     }
 
+    #paused {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 24px;
+      z-index: 5;
+      pointer-events: none;
+    }
+
     .replay-title {
   font-size: 48px;
   line-height: 1.1;
@@ -79,6 +94,7 @@
     <source src="video.mp4" type="video/mp4">
   </video>
 
+  <div id="paused">Pausado</div>
   <button id="sound">Activar sonido 🔊</button>
   <button id="replay">
     <span class="replay-title">▶</span>
@@ -89,17 +105,24 @@
     const video = document.getElementById("video");
     const soundbutton = document.getElementById("sound");
     const replayButton = document.getElementById("replay");
+    const pausedText = document.getElementById("paused");
 
     // Tocar el video para pausar o continuar
-    video.addEventListener("click", () => {
+    video.addEventListener("click", async () => {
       if (video.ended) {
         return;
       }
 
       if (video.paused) {
-        video.play();
+        try {
+          await video.play();
+          pausedText.style.display = "none";
+        } catch (error) {
+          pausedText.style.display = "block";
+        }
       } else {
         video.pause();
+        pausedText.style.display = "block";
       }
     });
     
