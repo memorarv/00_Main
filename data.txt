@@ -1,6 +1,6 @@
 usuario01 Piñera https://memorarv.github.io/02_Aguirre/
 usuario01 Sebastián https://memorarv.github.io/02_Aguirre/
 usuario01 Carvallo https://memorarv.github.io/02_Aguirre/
-usuario01 Miguel https://memorarv.github.io/01_Arnold/
-usuario01 Fuente https://memorarv.github.io/01_Arnold/
-usuario01 Alba https://memorarv.github.io/01_Arnold/
+usuario02 Miguel https://memorarv.github.io/01_Arnold/
+usuario02 Fuente https://memorarv.github.io/01_Arnold/
+usuario02 Alba https://memorarv.github.io/01_Arnold/
