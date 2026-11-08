@@ -54,6 +54,16 @@
     .dot.ready { background: #2a9969; }
     .dot.error { background: #d34d52; }
     .dot.dirty { background: #e4a42d; }
+    .dot.inactive { background: #9cabbc; }
+    .dot.new { background: #5076c4; }
+    .creation { background: #f4f8ff; border: 1px solid #d7e4f6; border-radius: 10px; padding: 13px; display: grid; gap: 9px; }
+    .creation .actions { margin: 0; }
+    .creation .btn { white-space: normal; }
+    .btn-add { background: #eaf2ff; border-color: #a5c3ed; }
+    .stat b { font-variant-numeric: tabular-nums; }
+    .user-item .user-meta { line-height: 1.4; }
+    .pending-note { color: #97620d; }
+
     .detail { padding: 22px; }
     .detail-title { display: flex; flex-wrap: wrap; gap: 11px; align-items: center; justify-content: space-between; margin-bottom: 17px; }
     .detail-title h2 { margin: 0; font-size: 1.2rem; overflow-wrap: anywhere; }
@@ -97,23 +107,36 @@
 <body>
 <header class="header">
   <h1>Administración de placas</h1>
-  <p>Consulta los usuarios activos, edita las palabras que reconoce cada cámara y actualiza sus archivos de configuración.</p>
+  <p>Administra usuarios activos e inactivos, sus palabras de reconocimiento y los archivos de configuración.</p>
 </header>
 <main>
   <div class="stats" aria-label="Resumen">
-    <div class="stat"><b id="stat-total">0</b><span>Usuarios activos</span></div>
+    <div class="stat"><b id="stat-total">0</b><span>Usuarios en listado</span></div>
+    <div class="stat"><b id="stat-active">0</b><span>Activos</span></div>
     <div class="stat"><b id="stat-ok">0</b><span>Archivos leídos</span></div>
     <div class="stat"><b id="stat-error">0</b><span>Errores de lectura</span></div>
-    <div class="stat"><b id="stat-dirty">0</b><span>Cambios pendientes</span></div>
+    <div class="stat"><b id="stat-dirty">0</b><span>Cambios por guardar</span></div>
   </div>
   <div class="layout">
     <aside class="panel" aria-label="Usuarios">
       <div class="panel-head">
-        <h2>Usuarios activos</h2>
-        <p class="subtle">Se obtienen de <code>./usuarios.txt</code>.</p>
+        <h2>Usuarios</h2>
+        <p class="subtle">Activos e inactivos; se obtienen de <code>./usuarios.txt</code>.</p>
       </div>
       <div class="sidebar-tools">
         <input id="search" type="search" placeholder="Buscar usuario o titular" aria-label="Buscar usuario o titular">
+        <button id="show-create" class="btn btn-add" type="button">+ Agregar usuario</button>
+        <div id="create-panel" class="creation hidden">
+          <label class="field" for="new-id"><span class="field-label">Identificador del nuevo usuario</span></label>
+          <input id="new-id" placeholder="Ej.: usuario04" maxlength="80" spellcheck="false" autocomplete="off">
+          <p class="hint">El nombre debe coincidir con la carpeta y el repositorio del nuevo usuario.</p>
+          <div class="actions">
+            <button id="create-confirm" class="btn btn-primary" type="button">Crear ficha</button>
+            <button id="create-cancel" class="btn" type="button">Cancelar</button>
+          </div>
+          <div id="create-message" class="message" role="status" aria-live="polite"></div>
+        </div>
+        <button id="download-list" class="btn btn-download" type="button">↓ Descargar usuarios.txt</button>
         <button id="reload" class="btn" type="button">↻ Volver a leer los archivos</button>
       </div>
       <div id="list" class="user-list" aria-live="polite"><div class="empty">Cargando usuarios…</div></div>
@@ -134,6 +157,13 @@
               <span class="hint">Identificador de la carpeta. Para cambiarlo hay que modificar también <code>usuarios.txt</code> y el nombre de la carpeta/repo.</span>
             </label>
             <label class="field">
+              <span class="field-label">Activo</span>
+              <select id="field-active">
+                <option value="activ1">activ1 — Activo</option>
+                <option value="activ0">activ0 — Inactivo</option>
+              </select>
+            </label>
+            <label class="field">
               <span class="field-label">Modo de configuración</span>
               <select id="field-mode">
                 <option value="config0">config0 — Ocultar ⚙</option>
@@ -141,9 +171,9 @@
               </select>
             </label>
             <label class="field full">
-              <span class="field-label">Nombre del titular (reservado)</span>
+              <span class="field-label">Nombre del titular</span>
               <input id="field-title" maxlength="200" placeholder="Nombre del titular">
-              <span class="hint">Se guarda como tercera línea, pero actualmente no interviene en el reconocimiento de placas.</span>
+              <span class="hint">Se guarda como cuarta línea del archivo.</span>
             </label>
             <label class="field full">
               <span class="field-label">URL de destino</span>
@@ -158,7 +188,7 @@
             <label class="field"><span class="field-label">Palabra 3</span><input class="word" id="word-3" maxlength="100" spellcheck="false"></label>
             <label class="field"><span class="field-label">Palabra 4</span><input class="word" id="word-4" maxlength="100" spellcheck="false"></label>
           </div>
-          <p class="hint">Se guardan juntas en la línea 5, separadas por un espacio, sin comas. Cada palabra debe ser una sola cadena sin espacios.</p>
+          <p class="hint">Se guardan juntas en la línea 6, separadas por un espacio, sin comas. Cada palabra debe ser una sola cadena sin espacios.</p>
           <div class="actions">
             <button id="download" class="btn btn-download" type="button">↓ Descargar usuario.txt</button>
             <button id="undo" class="btn" type="button">Descartar cambios</button>
@@ -169,139 +199,154 @@
 
         <section class="note" aria-labelledby="github-heading">
           <h3 id="github-heading">Guardar directamente en GitHub</h3>
-          <p class="subtle">Opcional. Para actualizar el archivo remoto, utiliza un token de acceso personal con permiso <strong>Contents: Read and write</strong> sobre el repositorio del usuario.</p>
+          <p class="subtle">Para editar usuarios existentes, el token necesita <strong>Contents: Read and write</strong> en su repositorio. Para agregar uno nuevo, necesita el mismo permiso tanto en su repositorio como en <code>00_Main</code>.</p>
           <div class="github-grid" style="margin-top:14px">
             <label class="field"><span class="field-label">Propietario de GitHub</span><input id="gh-owner" placeholder="Ej.: memorarv" spellcheck="false"></label>
             <label class="field"><span class="field-label">Repositorio de este usuario</span><input id="gh-repo" placeholder="Ej.: usuario01" spellcheck="false"></label>
-            <label class="field"><span class="field-label">Rama (opcional)</span><input id="gh-branch" placeholder="Vacío = rama predeterminada" spellcheck="false"></label>
+            <label class="field"><span class="field-label">Rama (opcional, para ambos repositorios)</span><input id="gh-branch" placeholder="Vacío = rama predeterminada" spellcheck="false"></label>
             <label class="field"><span class="field-label">Ruta del archivo en el repositorio</span><input id="gh-path" value="usuario.txt" spellcheck="false"></label>
+            <label class="field"><span class="field-label">Repositorio principal (lista de usuarios)</span><input id="gh-main-repo" value="00_Main" spellcheck="false"></label>
+            <label class="field"><span class="field-label">Ruta de usuarios.txt</span><input id="gh-list-path" value="usuarios.txt" spellcheck="false"></label>
             <label class="field full"><span class="field-label">Token de GitHub (no se guarda)</span><input id="gh-token" type="password" placeholder="github_pat_…" autocomplete="off" spellcheck="false"></label>
           </div>
           <div class="actions">
             <button id="github-save" type="button" class="btn btn-primary">Guardar cambios en GitHub</button>
           </div>
           <div id="github-message" class="message" role="status" aria-live="polite"></div>
-          <p class="smallprint">El token solo permanece en este formulario mientras la página está abierta; no se guarda en el navegador ni se agrega a los archivos. GitHub Pages puede tardar en publicar los cambios después del commit. No compartas enlaces que contengan tokens.</p>
+          <p class="smallprint">Para crear un usuario, primero crea su repositorio vacío (p. ej., <code>usuario04</code>) en GitHub. Esta aplicación crea <code>usuario.txt</code> allí y luego agrega el identificador a <code>00_Main/usuarios.txt</code>. La creación del repositorio y la activación de GitHub Pages no son automáticas. El token permanece solo en el formulario y no se guarda; no compartas tokens.</p>
         </section>
         <p class="smallprint" id="file-path"></p>
       </div>
     </section>
   </div>
-  <p class="smallprint">Formato requerido: línea 1 = usuario; línea 2 = config0 o config1; línea 3 = nombre del titular; línea 4 = URL; línea 5 = exactamente 4 palabras separadas por espacios. El archivo <code>usuarios.txt</code> puede contener un usuario por línea (también se aceptan espacios o comas entre identificadores). Las líneas que empiezan por # son comentarios.</p>
+  <p class="smallprint">Formato de <code>usuario.txt</code>: línea 1 = usuario; línea 2 = activ0/activ1; línea 3 = config0/config1; línea 4 = titular; línea 5 = URL; línea 6 = exactamente 4 palabras. <code>usuarios.txt</code> enumera todos los usuarios, incluso los inactivos. También se pueden leer archivos antiguos de cinco líneas; al guardar, se convierten al formato nuevo con <code>activ1</code>. Las líneas que empiezan por # en el listado son comentarios.</p>
 </main>
 <script>
 (() => {
   'use strict';
-  const $ = (id) => document.getElementById(id);
-  const state = { users: new Map(), ids: [], selected: null, epoch: 0, saving: false, repoOverrides: new Map() };
-  const BASE = new URL('./', window.location.href);
-  const expectedId = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
-  const wordInputs = [1, 2, 3, 4].map((n) => $('word-' + n));
+  const $ = id => document.getElementById(id);
+  const BASE = new URL('./', location.href);
+  const USER_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+  const REPO_NAME = /^[a-zA-Z0-9_.-]+$/;
+  const words = [1, 2, 3, 4].map(n => $('word-' + n));
+  const mainRepoFromUrl = decodeURIComponent(BASE.pathname.split('/').filter(Boolean).at(-1) || '00_Main');
+  const state = {
+    users: new Map(), ids: [], selected: null, epoch: 0, saving: false,
+    userListText: '', listLoaded: false, repoOverrides: new Map()
+  };
 
-  function sameFields(a, b) {
-    return JSON.stringify(a) === JSON.stringify(b);
-  }
-  function cloneFields(f) {
-    return { user: f.user, mode: f.mode, title: f.title, url: f.url, words: [...f.words] };
-  }
-  function normalized(text) {
+  $('gh-main-repo').value = mainRepoFromUrl;
+  const hostMatch = location.hostname.match(/^([^.]+)\.github\.io$/i);
+  if (hostMatch) $('gh-owner').value = hostMatch[1];
+
+  function normalize(text) {
     return text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').replace(/\n+$/, '');
   }
-  function parseConfig(content) {
-    const lines = normalized(content).split('\n');
-    if (lines.length !== 5) throw new Error(`El archivo tiene ${lines.length} líneas; se esperan 5.`);
-    return {
-      user: lines[0].trim(),
-      mode: lines[1].trim(),
-      title: lines[2].trim(),
-      url: lines[3].trim(),
-      words: lines[4].trim().split(/\s+/).filter(Boolean)
-    };
-  }
-  function serialize(f) {
-    return [f.user, f.mode, f.title, f.url, f.words.join(' ')].join('\n') + '\n';
-  }
   function parseUserList(text) {
-    const withoutComments = text.replace(/^\uFEFF/, '').split(/\r?\n/)
-      .map(line => line.replace(/#.*$/, '').trim()).filter(Boolean).join(' ');
-    const ids = [...new Set(withoutComments.split(/[\s,;]+/).map(s => s.trim()).filter(Boolean))];
-    const invalid = ids.filter(id => !expectedId.test(id) || id === '.' || id === '..');
-    if (invalid.length) throw new Error('Identificadores de usuario no válidos: ' + invalid.join(', '));
+    const all = text.replace(/^\uFEFF/, '').split(/\r?\n/)
+      .map(line => line.replace(/#.*$/, '').trim()).filter(Boolean).join(' ')
+      .split(/[\s,;]+/).map(s => s.trim()).filter(Boolean);
+    const ids = [...new Set(all)];
+    const invalid = ids.filter(id => !USER_ID.test(id) || id === '.' || id === '..');
+    if (invalid.length) throw new Error('Identificadores no válidos en usuarios.txt: ' + invalid.join(', '));
     return ids;
   }
-  function userUrl(id) {
-    // BASE = https://ejemplo.com/00_Main/ => ../usuario01/usuario.txt
-    return new URL('../' + encodeURIComponent(id) + '/usuario.txt', BASE);
+  function parseConfig(raw) {
+    const lines = normalize(raw).split('\n');
+    if (lines.length !== 6 && lines.length !== 5) {
+      throw new Error(`El archivo tiene ${lines.length} líneas; se esperan 6 (o 5 del formato anterior).`);
+    }
+    const legacy = lines.length === 5;
+    const l = legacy ? [lines[0], 'activ1', ...lines.slice(1)] : lines;
+    return {
+      fields: {
+        user: l[0].trim(), active: l[1].trim(), mode: l[2].trim(),
+        title: l[3].trim(), url: l[4].trim(),
+        words: l[5].trim().split(/\s+/).filter(Boolean)
+      }, legacy
+    };
   }
+  function clone(f) {
+    return { user: f.user, active: f.active, mode: f.mode, title: f.title, url: f.url, words: [...f.words] };
+  }
+  function serialize(f) {
+    return [f.user, f.active, f.mode, f.title, f.url, f.words.join(' ')].join('\n') + '\n';
+  }
+  function makeNew(id) {
+    const fields = { user: id, active: 'activ1', mode: 'config0', title: '', url: '', words: ['', '', '', ''] };
+    return { folder: id, status: 'ok', original: clone(fields), draft: clone(fields),
+      originalText: null, registered: false, fileCreated: false, legacy: false, error: '' };
+  }
+  function userUrl(id) { return new URL('../' + encodeURIComponent(id) + '/usuario.txt', BASE); }
   async function getText(url) {
-    const address = new URL(url);
-    address.searchParams.set('_', Date.now().toString());
-    const response = await fetch(address.href, { cache: 'no-store' });
+    const u = new URL(url);
+    u.searchParams.set('_', Date.now().toString());
+    const response = await fetch(u.href, { cache: 'no-store' });
     if (!response.ok) throw new Error(`HTTP ${response.status} al leer ${url.href || url}`);
     return response.text();
   }
-  function isDirty(record) {
-    return Boolean(record && record.status === 'ok' && !sameFields(record.draft, record.original));
+  function sameFields(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  function isDirty(r) {
+    return Boolean(r && r.status === 'ok' &&
+      (!r.registered || !r.fileCreated || !sameFields(r.draft, r.original)));
   }
-  function setMessage(id, text, kind = '') {
+  function anyPending() { return [...state.users.values()].some(isDirty); }
+  function setMessage(id, message, kind = '') {
     const node = $(id);
-    node.textContent = text;
+    node.textContent = message;
     node.className = 'message' + (kind ? ' ' + kind : '');
   }
   function refreshStats() {
-    const records = [...state.users.values()];
-    $('stat-total').textContent = state.ids.length;
-    $('stat-ok').textContent = records.filter(r => r.status === 'ok').length;
-    $('stat-error').textContent = records.filter(r => r.status === 'error').length;
-    $('stat-dirty').textContent = records.filter(isDirty).length;
+    const all = [...state.users.values()];
+    $('stat-total').textContent = state.ids.filter(id => state.users.get(id)?.registered).length;
+    $('stat-active').textContent = all.filter(r => r.status === 'ok' && r.draft.active === 'activ1').length;
+    $('stat-ok').textContent = all.filter(r => r.status === 'ok' && r.fileCreated).length;
+    $('stat-error').textContent = all.filter(r => r.status === 'error').length;
+    $('stat-dirty').textContent = all.filter(isDirty).length;
   }
-  function describe(record) {
-    if (record.status === 'error') return ['error', 'Error de lectura'];
-    if (record.status === 'loading') return ['', 'Cargando…'];
-    if (isDirty(record)) return ['dirty', 'Cambios pendientes'];
-    return ['ready', record.draft.mode];
+  function describe(r) {
+    if (r.status === 'error') return ['error', 'Error de lectura'];
+    if (r.status === 'loading') return ['', 'Cargando…'];
+    const active = r.draft.active === 'activ1' ? 'Activo' : 'Inactivo';
+    if (!r.registered) return ['new', 'Nuevo · falta registrar · ' + active];
+    if (isDirty(r)) return ['dirty', 'Cambios pendientes · ' + active];
+    return [r.draft.active === 'activ1' ? 'ready' : 'inactive', active + ' · ' + r.draft.mode + (r.legacy ? ' · formato anterior' : '')];
   }
   function renderList() {
     const filter = $('search').value.toLocaleLowerCase('es');
-    const container = $('list');
-    container.replaceChildren();
-    const ids = state.ids.filter(id => {
-      const r = state.users.get(id);
-      const title = r?.draft?.title || '';
+    const list = $('list');
+    list.replaceChildren();
+    const matches = state.ids.filter(id => {
+      const title = state.users.get(id)?.draft?.title || '';
       return (id + ' ' + title).toLocaleLowerCase('es').includes(filter);
     });
-    if (!ids.length) {
+    if (!matches.length) {
       const el = document.createElement('div');
       el.className = 'empty';
-      el.textContent = state.ids.length ? 'No hay usuarios que coincidan con la búsqueda.' : 'No se encontraron usuarios.';
-      container.append(el);
+      el.textContent = state.ids.length ? 'No hay coincidencias.' : 'No hay usuarios. Usa «Agregar usuario».';
+      list.append(el);
     }
-    for (const id of ids) {
+    for (const id of matches) {
       const record = state.users.get(id);
-      const [dotStyle, metaText] = describe(record);
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'user-item' + (id === state.selected ? ' active' : '');
-      btn.setAttribute('aria-current', id === state.selected ? 'true' : 'false');
-      const top = document.createElement('span');
-      top.className = 'user-top';
-      const name = document.createElement('span');
-      name.className = 'user-name';
-      name.textContent = id;
-      const dot = document.createElement('span');
-      dot.className = 'dot ' + dotStyle;
+      const [dotClass, summary] = describe(record);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'user-item' + (state.selected === id ? ' active' : '');
+      button.setAttribute('aria-current', state.selected === id ? 'true' : 'false');
+      const top = document.createElement('span'); top.className = 'user-top';
+      const name = document.createElement('span'); name.className = 'user-name'; name.textContent = id;
+      const dot = document.createElement('span'); dot.className = 'dot ' + dotClass;
       dot.setAttribute('aria-hidden', 'true');
       top.append(name, dot);
-      const meta = document.createElement('span');
-      meta.className = 'user-meta';
-      meta.textContent = metaText;
-      btn.append(top, meta);
-      btn.addEventListener('click', () => selectUser(id));
-      container.append(btn);
+      const meta = document.createElement('span'); meta.className = 'user-meta'; meta.textContent = summary;
+      button.append(top, meta);
+      button.addEventListener('click', () => selectUser(id));
+      list.append(button);
     }
     refreshStats();
   }
   function selectUser(id) {
+    if (state.saving) return;
     state.selected = id;
     renderList();
     renderEditor();
@@ -310,89 +355,95 @@
     $('detail').classList.add('hidden');
     $('placeholder').classList.remove('hidden');
   }
+  function updateChip(r) {
+    const chip = $('status-chip');
+    chip.className = isDirty(r) ? 'chip dirty' : 'chip';
+    chip.textContent = !r.registered ? 'Usuario nuevo · sin registrar'
+      : isDirty(r) ? 'Cambios pendientes' : 'Sin cambios';
+  }
   function renderEditor() {
     const id = state.selected;
     const record = state.users.get(id);
     if (!record || record.status !== 'ok') {
       clearEditor();
       $('placeholder').textContent = record?.status === 'error'
-        ? `No se pudo leer ${userUrl(id)}. ${record.error} Revisa el nombre de la carpeta y que exista usuario.txt.`
-        : record?.status === 'loading'
-          ? `Leyendo ${userUrl(id)}…`
-          : 'Selecciona un usuario de la lista para editar su configuración.';
+        ? `No se pudo leer ${userUrl(id)}. ${record.error}. Revisa que exista usuario.txt.`
+        : record?.status === 'loading' ? `Leyendo ${userUrl(id)}…`
+          : 'Selecciona un usuario de la lista para editarlo.';
       return;
     }
     $('placeholder').classList.add('hidden');
     $('detail').classList.remove('hidden');
-    $('detail-heading').textContent = record.folder;
+    $('detail-heading').textContent = id;
     $('field-user').value = record.draft.user;
-    $('field-mode').value = ['config0','config1'].includes(record.draft.mode) ? record.draft.mode : 'config0';
+    $('field-active').value = record.draft.active;
+    $('field-mode').value = record.draft.mode;
     $('field-title').value = record.draft.title;
     $('field-url').value = record.draft.url;
-    wordInputs.forEach((input, i) => input.value = record.draft.words[i] ?? '');
+    words.forEach((input, index) => input.value = record.draft.words[index] || '');
     $('gh-repo').value = state.repoOverrides.get(id) || id;
     $('file-path').textContent = 'Archivo publicado: ' + userUrl(id).href;
     updateChip(record);
-    setMessage('edit-message', record.draft.user === record.folder ? '' : `Advertencia: la línea 1 indica «${record.draft.user}» y la carpeta es «${record.folder}». Corrige el archivo antes de guardar.`, 'error');
+    $('undo').disabled = !record.registered && !record.fileCreated
+      ? false : !isDirty(record);
+    $('retry').disabled = !record.registered;
+    $('github-save').textContent = record.registered
+      ? 'Guardar cambios en GitHub' : 'Crear usuario y registrarlo en GitHub';
+    let warning = '';
+    if (record.draft.user !== record.folder) warning = `La línea 1 indica «${record.draft.user}» y la carpeta es «${id}».`;
+    else if (record.legacy) warning = 'Archivo antiguo de 5 líneas. Al guardar se agregará activ1 como segunda línea.';
+    else if (!record.registered) warning = 'Usuario nuevo: completa todos los campos y guarda en GitHub. También puedes descargar usuario.txt y usuarios.txt para subirlos manualmente.';
+    setMessage('edit-message', warning, warning && record.registered && !record.legacy ? 'error' : '');
     setMessage('github-message', '');
-    $('undo').disabled = !isDirty(record);
-  }
-  function updateChip(record) {
-    const chip = $('status-chip');
-    if (isDirty(record)) {
-      chip.className = 'chip dirty';
-      chip.textContent = 'Cambios pendientes';
-    } else {
-      chip.className = 'chip';
-      chip.textContent = 'Sin cambios';
-    }
   }
   function updateDraft() {
-    const record = state.users.get(state.selected);
-    if (!record || record.status !== 'ok') return;
-    record.draft = {
-      user: $('field-user').value.trim(),
-      mode: $('field-mode').value,
-      title: $('field-title').value,
-      url: $('field-url').value.trim(),
-      words: wordInputs.map(i => i.value.trim())
+    if (state.saving) return;
+    const r = state.users.get(state.selected);
+    if (!r || r.status !== 'ok') return;
+    r.draft = {
+      user: $('field-user').value.trim(), active: $('field-active').value,
+      mode: $('field-mode').value, title: $('field-title').value,
+      url: $('field-url').value.trim(), words: words.map(input => input.value.trim())
     };
-    updateChip(record);
-    $('undo').disabled = !isDirty(record);
+    updateChip(r);
+    $('undo').disabled = !isDirty(r);
     setMessage('edit-message', '');
     setMessage('github-message', '');
     renderList();
   }
-  function validationError(record) {
-    const f = record.draft;
-    if (!expectedId.test(f.user) || f.user !== record.folder) return 'El usuario de la línea 1 debe coincidir con la carpeta: ' + record.folder;
-    if (!['config0', 'config1'].includes(f.mode)) return 'El modo debe ser config0 o config1.';
-    if (/[\r\n]/.test(f.title)) return 'El nombre del titular no puede incluir saltos de línea.';
+  function validationError(r) {
+    const f = r.draft;
+    if (!USER_ID.test(f.user) || f.user !== r.folder) return 'El identificador debe coincidir con la carpeta: ' + r.folder;
+    if (!['activ0', 'activ1'].includes(f.active)) return 'Activo debe ser activ0 o activ1.';
+    if (!['config0', 'config1'].includes(f.mode)) return 'Configuración debe ser config0 o config1.';
+    if (!f.title.trim() || /[\r\n]/.test(f.title)) return 'Introduce un nombre de titular (sin saltos de línea).';
+    if (/\s/.test(f.url)) return 'La URL no puede contener espacios.';
     try {
       const u = new URL(f.url);
       if (!['http:', 'https:'].includes(u.protocol)) throw new Error('Protocolo no permitido');
-    } catch (_) { return 'Introduce una URL válida que empiece por https:// o http://.'; }
-    if (f.words.length !== 4 || f.words.some(w => !w || /\s/.test(w))) return 'Debes indicar exactamente 4 palabras, sin espacios internos.';
-    if (new Set(f.words.map(w => w.toLocaleLowerCase('es'))).size !== 4) return 'Las cuatro palabras deben ser diferentes entre sí.';
+    } catch (_) { return 'Introduce una URL válida que comience con https:// o http://.'; }
+    if (f.words.length !== 4 || f.words.some(w => !w || /\s/.test(w))) return 'Indica exactamente 4 palabras, sin espacios internos.';
+    if (new Set(f.words.map(w => w.toLocaleLowerCase('es'))).size !== 4) return 'Las cuatro palabras deben ser distintas.';
     return '';
   }
   async function loadUser(id, epoch) {
-    const record = state.users.get(id);
-    if (!record) return;
-    record.status = 'loading';
-    record.error = '';
+    const r = state.users.get(id);
+    if (!r) return;
+    r.status = 'loading'; r.error = '';
     try {
-      const content = await getText(userUrl(id));
+      const raw = await getText(userUrl(id));
       if (epoch !== state.epoch) return;
-      const parsed = parseConfig(content);
-      record.original = cloneFields(parsed);
-      record.draft = cloneFields(parsed);
-      record.originalText = normalized(content);
-      record.status = 'ok';
+      const parsed = parseConfig(raw);
+      r.original = clone(parsed.fields);
+      r.draft = clone(parsed.fields);
+      r.originalText = normalize(raw);
+      r.registered = true;
+      r.fileCreated = true;
+      r.legacy = parsed.legacy;
+      r.status = 'ok';
     } catch (err) {
       if (epoch !== state.epoch) return;
-      record.status = 'error';
-      record.error = err.message;
+      r.status = 'error'; r.error = err.message;
     }
     if (epoch === state.epoch) {
       renderList();
@@ -400,190 +451,269 @@
     }
   }
   async function loadAll() {
-    if ([...state.users.values()].some(isDirty) &&
-        !window.confirm('Hay cambios pendientes que no se han guardado. ¿Descartarlos y volver a leer?')) return;
+    if (state.saving) return;
+    if (anyPending() && !confirm('Hay cambios sin guardar o usuarios nuevos aún sin registrar. ¿Descartarlos y volver a leer?')) return;
     const epoch = ++state.epoch;
-    state.ids = [];
-    state.users.clear();
-    state.selected = null;
+    state.ids = []; state.users.clear(); state.selected = null;
+    state.listLoaded = false; state.userListText = '';
     clearEditor();
     $('list').innerHTML = '<div class="empty">Leyendo usuarios.txt…</div>';
     refreshStats();
     try {
-      const text = await getText(new URL('usuarios.txt', BASE));
+      const raw = await getText(new URL('usuarios.txt', BASE));
       if (epoch !== state.epoch) return;
-      const ids = parseUserList(text);
-      if (!ids.length) throw new Error('usuarios.txt está vacío. Agrega al menos un usuario.');
+      const ids = parseUserList(raw);
+      state.userListText = raw;
+      state.listLoaded = true;
       state.ids = ids;
-      ids.forEach(folder => state.users.set(folder, { folder, status: 'loading', error: '' }));
-      state.selected = ids[0];
-      renderList();
-      renderEditor();
+      ids.forEach(folder => state.users.set(folder, { folder, status: 'loading', registered: true, fileCreated: true, error: '' }));
+      state.selected = ids[0] || null;
+      renderList(); renderEditor();
       let next = 0;
-      const workerCount = Math.min(ids.length, 6);
-      await Promise.all(Array.from({length: workerCount}, async () => {
+      await Promise.all(Array.from({ length: Math.min(ids.length, 6) }, async () => {
         while (next < ids.length && epoch === state.epoch) {
-          const id = ids[next++];
-          await loadUser(id, epoch);
+          await loadUser(ids[next++], epoch);
         }
       }));
     } catch (err) {
       if (epoch !== state.epoch) return;
-      state.selected = null;
-      clearEditor();
-      const message = document.createElement('div');
-      message.className = 'empty';
-      message.textContent = `No se pudo cargar usuarios.txt: ${err.message}. Comprueba que la página se abre desde un servidor web (por ejemplo GitHub Pages) y que usuarios.txt está junto a index.html.`;
-      $('list').replaceChildren(message);
+      state.selected = null; clearEditor();
+      const msg = document.createElement('div'); msg.className = 'empty';
+      msg.textContent = `No se pudo cargar usuarios.txt: ${err.message}. Comprueba que el archivo está junto a index.html y que accedes a la página por un servidor web.`;
+      $('list').replaceChildren(msg);
       refreshStats();
     }
   }
-  async function retryUser() {
-    const record = state.users.get(state.selected);
-    if (!record) return;
-    if (isDirty(record) && !window.confirm('Este usuario tiene cambios sin guardar. ¿Descartarlos para releer?')) return;
-    const id = record.folder;
-    await loadUser(id, state.epoch);
+  function listWithIds(source, ids) {
+    const listed = new Set(parseUserList(source));
+    let result = normalize(source);
+    for (const id of ids) {
+      if (!listed.has(id)) {
+        result = result ? result + '\n' + id : id;
+        listed.add(id);
+      }
+    }
+    return result + '\n';
   }
-  function downloadFile() {
-    const record = state.users.get(state.selected);
-    if (!record || record.status !== 'ok') return;
-    const error = validationError(record);
-    if (error) { setMessage('edit-message', error, 'error'); return; }
-    const blob = new Blob([serialize(record.draft)], { type: 'text/plain;charset=utf-8' });
+  function createUser() {
+    if (state.saving || !state.listLoaded) {
+      setMessage('create-message', 'Primero debe cargarse usuarios.txt.', 'error'); return;
+    }
+    const id = $('new-id').value.trim();
+    if (!USER_ID.test(id) || id === '.' || id === '..') {
+      setMessage('create-message', 'Usa un identificador como usuario04, sin espacios ni barras.', 'error'); return;
+    }
+    if (state.ids.some(known => known.toLocaleLowerCase('es') === id.toLocaleLowerCase('es'))) {
+      setMessage('create-message', 'Ese usuario ya existe en la lista.', 'error'); return;
+    }
+    state.ids.push(id);
+    state.users.set(id, makeNew(id));
+    state.selected = id;
+    $('new-id').value = '';
+    $('create-panel').classList.add('hidden');
+    setMessage('create-message', '');
+    $('search').value = '';
+    renderList(); renderEditor();
+    $('field-title').focus();
+  }
+  function downloadText(name, content) {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url;
-    link.download = 'usuario.txt';
-    document.body.append(link);
-    link.click();
-    link.remove();
+    link.href = url; link.download = name;
+    document.body.append(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setMessage('edit-message', `Archivo descargado. Súbelo al repositorio o carpeta «${record.folder}», reemplazando su usuario.txt. Descargar no modifica el archivo publicado.`, 'ok');
   }
-  function textToBase64(text) {
+  function downloadUser() {
+    const r = state.users.get(state.selected);
+    if (!r || r.status !== 'ok') return;
+    const error = validationError(r);
+    if (error) { setMessage('edit-message', error, 'error'); return; }
+    downloadText('usuario.txt', serialize(r.draft));
+    setMessage('edit-message', `Descargado usuario.txt. Súbelo a la raíz del repositorio «${r.folder}». Si es nuevo, también descarga usuarios.txt para agregarlo al listado principal.`, 'ok');
+  }
+  function downloadList() {
+    if (!state.listLoaded) return;
+    downloadText('usuarios.txt', listWithIds(state.userListText, state.ids));
+    const r = state.users.get(state.selected);
+    if (r?.status === 'ok') setMessage('edit-message', 'Descargado usuarios.txt con todos los usuarios, incluidos los nuevos. Sustituye el archivo de 00_Main solo después de crear los archivos usuario.txt correspondientes.', 'ok');
+  }
+  function toB64(text) {
     const bytes = new TextEncoder().encode(text);
     let binary = '';
-    for (let i = 0; i < bytes.length; i += 8192) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-    }
+    for (let n = 0; n < bytes.length; n += 8192) binary += String.fromCharCode(...bytes.subarray(n, n + 8192));
     return btoa(binary);
   }
-  function base64ToText(base64) {
-    const binary = atob(base64.replace(/\s/g, ''));
-    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
-    return new TextDecoder().decode(bytes);
+  function fromB64(text) {
+    const binary = atob(text.replace(/\s/g, ''));
+    return new TextDecoder().decode(Uint8Array.from(binary, c => c.charCodeAt(0)));
   }
-  async function apiRequest(url, options = {}) {
-    const token = $('gh-token').value.trim();
+  class GitHubError extends Error {
+    constructor(status, message) { super(`GitHub HTTP ${status}: ${message}`); this.status = status; }
+  }
+  async function apiRequest(url, token, options = {}) {
     const response = await fetch(url, {
       ...options,
       headers: {
         Accept: 'application/vnd.github+json',
         Authorization: 'Bearer ' + token,
-        'X-GitHub-Api-Version': '2026-03-10',
+        'X-GitHub-Api-Version': '2022-11-28',
         ...options.headers
       }
     });
     let data;
     try { data = await response.json(); } catch (_) { data = {}; }
-    if (!response.ok) throw new Error(`GitHub HTTP ${response.status}: ${data.message || 'No se pudo completar la solicitud'}`);
+    if (!response.ok) throw new GitHubError(response.status, data.message || 'Solicitud no completada');
     return data;
   }
+  function contentsUrl(owner, repo, path) {
+    return `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/` +
+      path.split('/').map(encodeURIComponent).join('/');
+  }
+  function parseRemoteFile(data, path) {
+    if (data.type !== 'file' || !data.sha || typeof data.content !== 'string') {
+      throw new Error('GitHub no devolvió un archivo válido en ' + path);
+    }
+    return normalize(fromB64(data.content));
+  }
+  function validPath(path) {
+    return path && !path.split('/').some(s => !s || s === '.' || s === '..');
+  }
   async function saveGitHub() {
-    const selectedId = state.selected;
-    const record = state.users.get(selectedId);
-    if (!record || record.status !== 'ok' || state.saving) return;
-    const error = validationError(record);
+    const id = state.selected;
+    const r = state.users.get(id);
+    if (!r || r.status !== 'ok' || state.saving) return;
+    const error = validationError(r);
     if (error) { setMessage('github-message', error, 'error'); return; }
     const owner = $('gh-owner').value.trim();
     const repo = $('gh-repo').value.trim();
     const branch = $('gh-branch').value.trim();
     const path = $('gh-path').value.trim().replace(/^\/+/, '');
+    const mainRepo = $('gh-main-repo').value.trim();
+    const listPath = $('gh-list-path').value.trim().replace(/^\/+/, '');
     const token = $('gh-token').value.trim();
-    if (!owner || !repo || !path || !token) {
-      setMessage('github-message', 'Completa el propietario, repositorio, ruta y token de acceso.', 'error');
-      return;
+    if (!REPO_NAME.test(owner) || !REPO_NAME.test(repo) || !validPath(path) || !token ||
+        (!r.registered && (!REPO_NAME.test(mainRepo) || !validPath(listPath)))) {
+      setMessage('github-message', 'Completa y revisa propietario, repositorios, rutas y token.', 'error'); return;
     }
-    if (!/^[a-zA-Z0-9_.-]+$/.test(owner) || !/^[a-zA-Z0-9_.-]+$/.test(repo) ||
-        path.split('/').some(p => !p || p === '.' || p === '..')) {
-      setMessage('github-message', 'Revisa el nombre del propietario, repositorio y ruta del archivo.', 'error');
-      return;
-    }
-    const encodedPath = path.split('/').map(encodeURIComponent).join('/');
-    const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodedPath}`;
-    const lookupUrl = apiUrl + (branch ? '?ref=' + encodeURIComponent(branch) : '');
-    const toSave = cloneFields(record.draft);
-    const savedText = serialize(toSave);
+    const snapshot = clone(r.draft);
+    const wasNew = !r.registered;
+    const savedText = serialize(snapshot);
+    const fileApi = contentsUrl(owner, repo, path);
+    const listApi = contentsUrl(owner, mainRepo, listPath);
+    const branchQuery = branch ? '?ref=' + encodeURIComponent(branch) : '';
     const button = $('github-save');
     state.saving = true;
-    button.disabled = true;
-    button.textContent = 'Guardando…';
-    setMessage('github-message', 'Comprobando la versión actual del archivo en GitHub…');
+    button.disabled = true; $('reload').disabled = true; $('show-create').disabled = true;
+    [...$('edit-form').querySelectorAll('input,select,button')].forEach(el => el.disabled = true);
+    setMessage('github-message', 'Comprobando el archivo del usuario en GitHub…');
     try {
-      const current = await apiRequest(lookupUrl);
-      if (current.type !== 'file' || !current.sha || typeof current.content !== 'string') {
-        throw new Error('GitHub no devolvió el contenido de usuario.txt. Comprueba la ruta y el tamaño del archivo.');
+      let remote = null;
+      try { remote = await apiRequest(fileApi + branchQuery, token); }
+      catch (e) { if (!(e instanceof GitHubError && e.status === 404 && !r.fileCreated)) throw e; }
+      if (r.fileCreated) {
+        if (!remote) throw new Error('No se encuentra usuario.txt en el repositorio indicado.');
+        if (parseRemoteFile(remote, path) !== r.originalText) {
+          throw new Error('usuario.txt cambió en GitHub desde la última lectura, o la rama no coincide. No se sobrescribió. Vuelve a cargar los archivos.');
+        }
+      } else if (remote && parseRemoteFile(remote, path) !== normalize(savedText)) {
+        throw new Error('El repositorio ya tiene un usuario.txt diferente. No se sobrescribió. Revisa el identificador y el repositorio.');
       }
-      const remoteText = normalized(base64ToText(current.content));
-      if (remoteText !== record.originalText) {
-        throw new Error('El archivo de GitHub cambió desde la última lectura o la rama no coincide con la publicada. No se sobrescribió. Revisa la rama y vuelve a leer antes de editar.');
+      if (!remote || parseRemoteFile(remote, path) !== normalize(savedText)) {
+        setMessage('github-message', 'Guardando usuario.txt…');
+        await apiRequest(fileApi, token, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: `${r.fileCreated ? 'Actualizar' : 'Crear'} usuario.txt: ${id}`,
+            content: toB64(savedText),
+            ...(remote ? { sha: remote.sha } : {}),
+            ...(branch ? { branch } : {})
+          })
+        });
       }
-      setMessage('github-message', 'Enviando actualización a GitHub…');
-      await apiRequest(apiUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: `Actualizar configuración de placas: ${selectedId}`,
-          content: textToBase64(savedText),
-          sha: current.sha,
-          ...(branch ? { branch } : {})
-        })
-      });
-      record.originalText = normalized(savedText);
-      record.original = cloneFields(toSave);
-      setMessage('github-message', `Guardado correctamente en ${owner}/${repo} (${branch || 'rama predeterminada'}). La publicación en GitHub Pages puede demorarse.`, 'ok');
+      r.original = clone(snapshot);
+      r.originalText = normalize(savedText);
+      r.fileCreated = true;
+      r.legacy = false;
+      if (!r.registered) {
+        setMessage('github-message', 'usuario.txt guardado. Agregando el usuario a usuarios.txt…');
+        const listRemote = await apiRequest(listApi + branchQuery, token);
+        const rawList = parseRemoteFile(listRemote, listPath);
+        const currentIds = parseUserList(rawList);
+        const newList = listWithIds(rawList, [id]);
+        if (!currentIds.includes(id)) {
+          await apiRequest(listApi, token, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: `Agregar usuario ${id} al listado de placas`,
+              content: toB64(newList), sha: listRemote.sha,
+              ...(branch ? { branch } : {})
+            })
+          });
+        }
+        state.userListText = newList;
+        r.registered = true;
+      }
+      setMessage('github-message', wasNew
+        ? `Guardado correctamente: creado ${owner}/${repo}/${path} y registrado ${id} en ${owner}/${mainRepo}/${listPath}. GitHub Pages puede demorar en publicar los cambios.`
+        : `Guardado correctamente en ${owner}/${repo}/${path}. GitHub Pages puede demorar en publicar los cambios.`, 'ok');
       renderList();
-      if (state.selected === selectedId) {
-        updateChip(record);
-        $('undo').disabled = !isDirty(record);
+      if (state.selected === id) {
+        updateChip(r);
+        $('undo').disabled = !isDirty(r);
+        $('retry').disabled = !r.registered;
+        button.textContent = 'Guardar cambios en GitHub';
       }
     } catch (err) {
-      setMessage('github-message', err.message, 'error');
+      let extra = '';
+      if (!r.registered && r.fileCreated) extra = '\nusuario.txt ya se guardó, pero falta registrar el usuario en usuarios.txt. Corrige el problema y vuelve a pulsar Guardar; no se duplicará el archivo.';
+      else if (err instanceof GitHubError && err.status === 404) extra = '\nComprueba que el repositorio ya existe, el token tiene acceso y el nombre de la rama es correcto.';
+      setMessage('github-message', err.message + extra, 'error');
+      renderList();
     } finally {
       state.saving = false;
-      button.disabled = false;
-      button.textContent = 'Guardar cambios en GitHub';
+      button.disabled = false; $('reload').disabled = false; $('show-create').disabled = false;
+      [...$('edit-form').querySelectorAll('input,select,button')].forEach(el => el.disabled = false);
+      const selected = state.users.get(state.selected);
+      $('undo').disabled = selected ? !isDirty(selected) : true;
+      $('retry').disabled = !selected?.registered;
+      button.textContent = selected?.registered ? 'Guardar cambios en GitHub' : 'Crear usuario y registrarlo en GitHub';
     }
   }
-
-  // Los cambios se conservan en memoria al cambiar de usuario hasta descargar/guardar/releer.
-  ['field-mode', 'field-title', 'field-url', 'word-1', 'word-2', 'word-3', 'word-4']
+  ['field-active','field-mode','field-title','field-url','word-1','word-2','word-3','word-4']
     .forEach(id => $(id).addEventListener('input', updateDraft));
-  $('edit-form').addEventListener('submit', e => e.preventDefault());
-  $('download').addEventListener('click', downloadFile);
-  $('github-save').addEventListener('click', saveGitHub);
+  $('edit-form').addEventListener('submit', event => event.preventDefault());
   $('search').addEventListener('input', renderList);
+  $('download').addEventListener('click', downloadUser);
+  $('download-list').addEventListener('click', downloadList);
   $('reload').addEventListener('click', loadAll);
-  $('retry').addEventListener('click', retryUser);
+  $('github-save').addEventListener('click', saveGitHub);
+  $('show-create').addEventListener('click', () => {
+    if (!state.listLoaded) { alert('Primero carga usuarios.txt.'); return; }
+    $('create-panel').classList.toggle('hidden');
+    if (!$('create-panel').classList.contains('hidden')) $('new-id').focus();
+  });
+  $('create-cancel').addEventListener('click', () => { $('create-panel').classList.add('hidden'); setMessage('create-message', ''); });
+  $('create-confirm').addEventListener('click', createUser);
+  $('new-id').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); createUser(); } });
+  $('retry').addEventListener('click', async () => {
+    const r = state.users.get(state.selected);
+    if (!r || !r.registered || state.saving) return;
+    if (isDirty(r) && !confirm('¿Descartar los cambios y volver a leer?')) return;
+    await loadUser(r.folder, state.epoch);
+  });
   $('undo').addEventListener('click', () => {
-    const record = state.users.get(state.selected);
-    if (!record || record.status !== 'ok') return;
-    record.draft = cloneFields(record.original);
-    renderEditor();
-    renderList();
+    const r = state.users.get(state.selected);
+    if (!r || r.status !== 'ok' || state.saving) return;
+    r.draft = clone(r.original);
+    renderEditor(); renderList();
   });
   $('gh-repo').addEventListener('input', () => {
     if (state.selected) state.repoOverrides.set(state.selected, $('gh-repo').value);
   });
-  window.addEventListener('beforeunload', e => {
-    if ([...state.users.values()].some(isDirty)) {
-      e.preventDefault();
-      e.returnValue = '';
-    }
+  window.addEventListener('beforeunload', event => {
+    if (anyPending()) { event.preventDefault(); event.returnValue = ''; }
   });
-  const hostMatch = window.location.hostname.match(/^([^.]+)\.github\.io$/i);
-  if (hostMatch) $('gh-owner').value = hostMatch[1];
   loadAll();
 })();
 </script>
